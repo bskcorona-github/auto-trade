@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 ```
 # 取引所API設定
-BINANCE_API_KEY=your_binance_api_key
+BINANCE_API_KEY=BINANCE_API_KEY
 BINANCE_SECRET_KEY=your_binance_secret_key
 BITFLYER_API_KEY=your_bitflyer_api_key
 BITFLYER_SECRET_KEY=your_bitflyer_secret_key

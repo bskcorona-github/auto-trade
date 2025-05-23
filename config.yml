@@ -1,6 +1,6 @@
 # API Keys (Keep these secret and use .env for actual values in production)
 # These are placeholders for structure, actual keys should be in .env
-binance_api_key: YOUR_BINANCE_API_KEY
+binance_api_key: BINANCE_API_KEY
 binance_secret_key: YOUR_BINANCE_SECRET_KEY
 
 # Backtest General Settings

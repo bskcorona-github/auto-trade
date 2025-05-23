@@ -100,7 +100,7 @@ class SimpleDataFetcher:
                 secret_key = config.get('binance_secret_key')
                 self.logger.info("config.yml から Secretキープレースホルダーを読み込みました。(本番環境非推奨)")
 
-            if not api_key or not secret_key or api_key == 'YOUR_BINANCE_API_KEY':
+            if not api_key or not secret_key or api_key == 'BINANCE_API_KEY':
                 self.logger.warning("有効なAPIキーが設定されていません。模擬データを使用します。")
                 self.use_real_data = False
                 return None

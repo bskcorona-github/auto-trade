@@ -49,6 +49,9 @@ class BacktestVisualizer:
         
         # 結果と取引データが直接渡された場合は前処理
         if self.results_df is not None:
+            # NaN値を削除または置換
+            self.results_df = self._clean_data(self.results_df)
+            
             # 日付列をdatetime型に変換
             if 'date' in self.results_df.columns and not pd.api.types.is_datetime64_any_dtype(self.results_df['date']):
                 self.results_df['date'] = pd.to_datetime(self.results_df['date'])
@@ -56,6 +59,9 @@ class BacktestVisualizer:
                 self.results_df.set_index('date', inplace=True)
         
         if self.trades_df is not None:
+            # NaN値を削除または置換
+            self.trades_df = self._clean_data(self.trades_df)
+            
             # 日付列をdatetime型に変換
             if 'entry_time' in self.trades_df.columns and not pd.api.types.is_datetime64_any_dtype(self.trades_df['entry_time']):
                 self.trades_df['entry_time'] = pd.to_datetime(self.trades_df['entry_time'])
@@ -79,6 +85,122 @@ class BacktestVisualizer:
             'table_cell_color': '#f8f9fa',
         }
         
+    def _clean_data(self, df):
+        """
+        データフレームのクリーニング - NaNやInfinity値を処理
+        
+        Args:
+            df (pandas.DataFrame): クリーニング対象のデータフレーム
+            
+        Returns:
+            pandas.DataFrame: クリーニング済みデータフレーム
+        """
+        # コピーを作成して元のデータを変更しない
+        cleaned_df = df.copy()
+        
+        # 数値型の列のみを処理
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            # 無限大の値を置換
+            if col in cleaned_df:
+                # inf を大きな値に置換
+                cleaned_df[col] = cleaned_df[col].replace([np.inf, -np.inf], [1e10, -1e10])
+                
+                # NaN値を0に置換
+                cleaned_df[col] = cleaned_df[col].fillna(0)
+        
+        return cleaned_df
+
+    def _clean_figure_data(self, fig):
+        """
+        Plotlyの図オブジェクトから無効なデータ（NaN, Infinity）をクリーニング
+        
+        Args:
+            fig (plotly.graph_objects.Figure): クリーニング対象の図
+            
+        Returns:
+            plotly.graph_objects.Figure: クリーニング済みの図
+        """
+        if fig is None:
+            return None
+            
+        try:
+            # データのコピーを作成
+            for trace_idx, trace in enumerate(fig.data):
+                # X, Y データの処理
+                if hasattr(trace, 'x') and trace.x is not None:
+                    x_array = np.array(trace.x)
+                    # NaN と Infinity を置換
+                    mask_x = np.isfinite(x_array)
+                    if not np.all(mask_x):
+                        # 無効な値を含む場合は、その値を除外または置換
+                        valid_x = x_array[mask_x]
+                        if len(valid_x) > 0:
+                            if isinstance(trace.x, list):
+                                for i in range(len(trace.x)):
+                                    if not np.isfinite(trace.x[i]):
+                                        trace.x[i] = 0
+                
+                if hasattr(trace, 'y') and trace.y is not None:
+                    y_array = np.array(trace.y)
+                    # NaN と Infinity を置換
+                    mask_y = np.isfinite(y_array)
+                    if not np.all(mask_y):
+                        # 無効な値を含む場合は、その値を除外または置換
+                        valid_y = y_array[mask_y]
+                        if len(valid_y) > 0:
+                            if isinstance(trace.y, list):
+                                for i in range(len(trace.y)):
+                                    if not np.isfinite(trace.y[i]):
+                                        trace.y[i] = 0
+                
+                # Z データ（ヒートマップなど）の処理
+                if hasattr(trace, 'z') and trace.z is not None:
+                    z_array = np.array(trace.z)
+                    if z_array.ndim == 2:  # 2次元配列の場合
+                        for i in range(z_array.shape[0]):
+                            for j in range(z_array.shape[1]):
+                                if not np.isfinite(z_array[i, j]):
+                                    z_array[i, j] = 0
+                        fig.data[trace_idx].z = z_array
+            
+            return fig
+        except Exception as e:
+            print(f"図データのクリーニング中にエラー: {e}")
+            return fig
+
+    def _safe_json_serialize(self, fig):
+        """
+        安全にJSON変換できるように図データをシリアライズ
+        
+        Args:
+            fig (plotly.graph_objects.Figure): 変換対象の図
+            
+        Returns:
+            str: JSON文字列
+        """
+        try:
+            # 最初にクリーニング
+            cleaned_fig = self._clean_figure_data(fig)
+            
+            # PlotlyJSONEncoderを使用してJSON文字列に変換
+            json_str = json.dumps(cleaned_fig, cls=PlotlyJSONEncoder)
+            
+            return json_str
+        except Exception as e:
+            print(f"JSON変換中にエラー: {e}")
+            # エラーの場合は空の図を返す
+            empty_fig = go.Figure()
+            empty_fig.add_annotation(
+                text="データのエラーにより表示できません",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=20)
+            )
+            return json.dumps(empty_fig, cls=PlotlyJSONEncoder)
+        
     def load_data(self, results_file='advanced_backtest_results.csv', trades_file='advanced_backtest_trades.csv'):
         """
         バックテスト結果データ読み込み
@@ -95,6 +217,9 @@ class BacktestVisualizer:
             results_path = os.path.join(self.results_dir, results_file)
             self.results_df = pd.read_csv(results_path)
             
+            # NaN値や異常値の処理
+            self.results_df = self._clean_data(self.results_df)
+            
             # 日付列をdatetime型に変換
             if 'date' in self.results_df.columns:
                 self.results_df['date'] = pd.to_datetime(self.results_df['date'])
@@ -104,6 +229,9 @@ class BacktestVisualizer:
             # 取引履歴データ読み込み
             trades_path = os.path.join(self.results_dir, trades_file)
             self.trades_df = pd.read_csv(trades_path)
+            
+            # NaN値や異常値の処理
+            self.trades_df = self._clean_data(self.trades_df)
             
             # 日付列をdatetime型に変換
             if 'entry_time' in self.trades_df.columns:
@@ -762,6 +890,14 @@ class BacktestVisualizer:
         monthly_fig = self._create_monthly_performance()
         metrics_table = self._create_metrics_table()
         
+        # 各グラフをクリーニング
+        equity_curve = self._clean_figure_data(equity_curve)
+        trade_pie = self._clean_figure_data(trade_pie)
+        trade_hist = self._clean_figure_data(trade_hist)
+        trade_scatter = self._clean_figure_data(trade_scatter)
+        monthly_fig = self._clean_figure_data(monthly_fig)
+        metrics_table = self._clean_figure_data(metrics_table)
+        
         # CSS スタイル
         css_styles = """
         body {
@@ -956,42 +1092,57 @@ class BacktestVisualizer:
             </div>
             
             <script>
+                // エラーキャッチ用のラッパー関数
+                function safeNewPlot(divId, data, layout, config) {{
+                    try {{
+                        Plotly.newPlot(divId, data, layout, config);
+                    }} catch (error) {{
+                        console.error('プロット作成エラー (' + divId + '):', error);
+                        // エラー時に簡易メッセージを表示
+                        document.getElementById(divId).innerHTML = 
+                            '<div style="text-align:center;padding:20px;color:#d62728">グラフの表示中にエラーが発生しました。</div>';
+                    }}
+                }}
         """
         
         # 各グラフのJSONデータを埋め込む
         if equity_curve:
-            html_content += f"var equityCurveData = {json.dumps(equity_curve, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('equity-curve', equityCurveData.data, equityCurveData.layout, {{responsive: true}});\n"
+            html_content += f"var equityCurveData = {self._safe_json_serialize(equity_curve)};\n"
+            html_content += "safeNewPlot('equity-curve', equityCurveData.data, equityCurveData.layout, {responsive: true});\n"
         
         if trade_pie:
-            html_content += f"var tradePieData = {json.dumps(trade_pie, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('trade-pie', tradePieData.data, tradePieData.layout, {{responsive: true}});\n"
+            html_content += f"var tradePieData = {self._safe_json_serialize(trade_pie)};\n"
+            html_content += "safeNewPlot('trade-pie', tradePieData.data, tradePieData.layout, {responsive: true});\n"
         
         if trade_hist:
-            html_content += f"var tradeHistData = {json.dumps(trade_hist, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('trade-hist', tradeHistData.data, tradeHistData.layout, {{responsive: true}});\n"
+            html_content += f"var tradeHistData = {self._safe_json_serialize(trade_hist)};\n"
+            html_content += "safeNewPlot('trade-hist', tradeHistData.data, tradeHistData.layout, {responsive: true});\n"
         
         if trade_scatter:
-            html_content += f"var tradeScatterData = {json.dumps(trade_scatter, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('trade-scatter', tradeScatterData.data, tradeScatterData.layout, {{responsive: true}});\n"
+            html_content += f"var tradeScatterData = {self._safe_json_serialize(trade_scatter)};\n"
+            html_content += "safeNewPlot('trade-scatter', tradeScatterData.data, tradeScatterData.layout, {responsive: true});\n"
         
         if monthly_fig:
-            html_content += f"var monthlyPerfData = {json.dumps(monthly_fig, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('monthly-performance', monthlyPerfData.data, monthlyPerfData.layout, {{responsive: true}});\n"
+            html_content += f"var monthlyPerfData = {self._safe_json_serialize(monthly_fig)};\n"
+            html_content += "safeNewPlot('monthly-performance', monthlyPerfData.data, monthlyPerfData.layout, {responsive: true});\n"
         
         if metrics_table:
-            html_content += f"var metricsTableData = {json.dumps(metrics_table, cls=PlotlyJSONEncoder)};\n"
-            html_content += "Plotly.newPlot('metrics-table', metricsTableData.data, metricsTableData.layout, {{responsive: true}});\n"
+            html_content += f"var metricsTableData = {self._safe_json_serialize(metrics_table)};\n"
+            html_content += "safeNewPlot('metrics-table', metricsTableData.data, metricsTableData.layout, {responsive: true});\n"
         
         html_content += """
                 // レスポンシブ対応
                 window.addEventListener('resize', function() {
                     const graphDivs = document.querySelectorAll('[id^="equity-"], [id^="trade-"], [id^="monthly-"], [id^="metrics-"]');
                     graphDivs.forEach(function(div) {
-                        Plotly.relayout(div, {
-                            'width': div.offsetWidth,
-                            'height': div.offsetHeight
-                        });
+                        try {
+                            Plotly.relayout(div, {
+                                'width': div.offsetWidth,
+                                'height': div.offsetHeight
+                            });
+                        } catch (error) {
+                            console.error('リサイズエラー:', error);
+                        }
                     });
                 });
             </script>
