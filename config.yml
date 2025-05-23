@@ -1,0 +1,92 @@
+# API Keys (Keep these secret and use .env for actual values in production)
+# These are placeholders for structure, actual keys should be in .env
+binance_api_key: YOUR_BINANCE_API_KEY
+binance_secret_key: YOUR_BINANCE_SECRET_KEY
+
+# Backtest General Settings
+default_symbol: BTC/USDT
+default_timeframe: 1h
+default_initial_capital: 1000000
+default_backtest_years: 3
+commission_rate: 0.001
+slippage_percentage: 0.001
+use_stop_loss_default: true
+plot_results_default: true
+use_mock_data_default: false # Set to true to use mock data without API keys
+
+# ディレクトリ構造
+logs_dir: logs
+results_dir: results
+
+# Advanced Strategy Parameters
+# Risk Management
+risk_params:
+  risk_per_trade: 0.02 # Percentage of capital to risk per trade
+  # ATR Based Risk Parameters (if ATR is available)
+  atr_period_for_risk: 14
+  atr_multiplier_stop_loss: 2.0
+  atr_multiplier_take_profit: 4.0
+  atr_multiplier_trailing_stop: 1.5
+  # Fallback Risk Parameters (fixed percentage, used if ATR is not available or zero)
+  fallback_stop_loss_percentage: 0.03
+  fallback_take_profit_percentage: 0.06
+  fallback_trailing_stop_percentage: 0.02
+
+# Signal Generation Parameters
+strategy_params:
+  # SMA Crossover
+  sma_short_period: 50
+  sma_medium_period: 100
+  sma_long_period: 200
+
+  # EMA Crossover
+  ema_very_short_period: 9
+  ema_short_period: 20
+  ema_medium_period: 50
+  ema_long_period: 200
+
+  # RSI
+  rsi_period_trade: 14
+  rsi_short_period: 7
+  rsi_oversold_threshold: 30
+  rsi_overbought_threshold: 70
+
+  # MACD
+  macd_fast_period: 12
+  macd_slow_period: 26
+  macd_signal_period: 9
+
+  # Bollinger Bands
+  bb_period: 20
+  bb_std_dev: 2
+
+  # ADX
+  adx_period_trade: 14
+  adx_trend_threshold: 25
+
+  # Stochastic
+  stoch_k_period: 14
+  stoch_d_period: 3
+  stoch_oversold: 30 # Adjusted from 20 to 30 for less frequent signals
+  stoch_overbought: 70 # Adjusted from 80 to 70 for less frequent signals
+
+  # Volume Surge
+  volume_sma_period_trade: 20
+  volume_surge_ratio: 2.0
+
+  # Volatility
+  volatility_period_trade: 20
+  volatility_threshold: 2.0 # Example threshold for high volatility
+
+  # ATR Breakout
+  atr_breakout_period: 5 # Lookback period for recent high/low for ATR breakout
+  atr_breakout_multiplier: 1.0 # Multiplier for ATR for breakout signal
+
+  # Channel Breakout
+  channel_breakout_period: 20
+
+# Logging
+logging:
+  log_file: advanced_backtest.log
+  log_level: INFO
+  data_fetcher_log: data_fetcher.log
